@@ -1,0 +1,238 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Token Usage</title>
+    <script>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem("tokenUsageTheme");
+          const fallback = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          document.documentElement.dataset.theme = savedTheme || fallback;
+        } catch {
+          document.documentElement.dataset.theme = "light";
+        }
+        try {
+          const savedLocale = localStorage.getItem("tokenUsageLocale");
+          const localeFallback = navigator.language?.startsWith("zh") ? "zh" : "en";
+          const locale = savedLocale || localeFallback;
+          document.documentElement.dataset.locale = locale;
+          document.documentElement.lang = locale === "en" ? "en" : "zh-CN";
+        } catch {
+          document.documentElement.dataset.locale = "zh";
+          document.documentElement.lang = "zh-CN";
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>Token Usage</h1>
+          <p id="subtitle" data-i18n="status_scanning">正在扫描本机 Claude 与 Codex 用量...</p>
+          <p id="autoRefreshStatus" data-i18n="status_refresh_ready">自动刷新准备中...</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="toggle-group" id="localeToggle" role="group" data-i18n-aria-label="aria_language" aria-label="语言">
+            <button type="button" data-locale-option="zh" data-i18n="locale_zh">中文</button>
+            <button type="button" data-locale-option="en" data-i18n="locale_en">English</button>
+          </div>
+          <div class="toggle-group" id="themeToggle" role="group" data-i18n-aria-label="aria_theme" aria-label="主题">
+            <button type="button" data-theme-option="light" data-i18n="theme_light">浅色</button>
+            <button type="button" data-theme-option="dark" data-i18n="theme_dark">深色</button>
+          </div>
+          <button id="refreshButton" type="button" data-i18n="action_refresh">强制重扫</button>
+        </div>
+      </header>
+
+      <section class="toolbar" data-i18n-aria-label="aria_filter" aria-label="筛选">
+        <div class="control-group">
+          <span data-i18n="provider_all">全部</span>
+          <div class="segmented" id="providerButtons" data-i18n-aria-label="aria_provider" aria-label="来源">
+            <button type="button" data-provider="all" class="active" data-i18n="provider_all">全部</button>
+            <button type="button" data-provider="claude" data-i18n="provider_claude">Claude</button>
+            <button type="button" data-provider="codex" data-i18n="provider_codex">Codex</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <span data-i18n="toolbar_scope">范围</span>
+          <div class="segmented" id="presetButtons">
+            <button type="button" data-preset="today" data-i18n="preset_today">今日</button>
+            <button type="button" data-preset="week" data-i18n="preset_week">本周</button>
+            <button type="button" data-preset="month" data-i18n="preset_month">本月</button>
+            <button type="button" data-preset="all" class="active" data-i18n="preset_all">全部</button>
+            <div class="recent-segment" data-preset="recent">
+              <span class="recent-segment-label" data-i18n="preset_recent">最近</span>
+              <span class="recent-combobox">
+                <input
+                  id="recentValue"
+                  class="recent-segment-input"
+                  type="text"
+                  value="1个月"
+                  autocomplete="off"
+                  data-i18n-aria-label="aria_recent_range"
+                  aria-label="最近范围"
+                  aria-controls="recentRangeMenu"
+                  aria-expanded="false"
+                  aria-haspopup="listbox"
+                />
+                <button
+                  id="recentMenuButton"
+                  class="recent-menu-button"
+                  type="button"
+                  data-i18n-aria-label="aria_recent_expand"
+                  aria-label="展开最近范围选项"
+                  aria-controls="recentRangeMenu"
+                  aria-expanded="false"
+                >
+                </button>
+              </span>
+              <div id="recentRangeMenu" class="recent-range-menu" role="listbox" hidden>
+                <button type="button" role="option" data-recent-option="1天" data-i18n="recent_1day" aria-selected="false">1天</button>
+                <button type="button" role="option" data-recent-option="1周" data-i18n="recent_1week" aria-selected="false">1周</button>
+                <button type="button" role="option" data-recent-option="1个月" data-i18n="recent_1month" aria-selected="true">1个月</button>
+                <button type="button" role="option" data-recent-option="2个月" data-i18n="recent_2month" aria-selected="false">2个月</button>
+                <button type="button" role="option" data-recent-option="3个月" data-i18n="recent_3month" aria-selected="false">3个月</button>
+                <button type="button" role="option" data-recent-option="半年" data-i18n="recent_6month" aria-selected="false">半年</button>
+                <button type="button" role="option" data-recent-option="一年" data-i18n="recent_1year" aria-selected="false">一年</button>
+              </div>
+            </div>
+            <button type="button" data-preset="custom" data-i18n="preset_custom">自定义</button>
+          </div>
+        </div>
+        <div class="control-group custom-range">
+          <label>
+            <span data-i18n="toolbar_start">开始</span>
+            <span class="date-input-wrap">
+              <input id="startDate" type="text" autocomplete="off" inputmode="numeric" data-i18n-placeholder="date_placeholder" placeholder="年/月/日" />
+              <button
+                class="date-picker-button"
+                type="button"
+                data-date-picker-button="start"
+                data-i18n-aria-label="aria_date_picker_start"
+                aria-label="打开开始日期日历"
+                aria-controls="startDatePicker"
+                aria-expanded="false"
+              ></button>
+              <div id="startDatePicker" class="date-picker-popover" data-date-picker="start" hidden></div>
+            </span>
+          </label>
+          <label>
+            <span data-i18n="toolbar_end">结束</span>
+            <span class="date-input-wrap">
+              <input id="endDate" type="text" autocomplete="off" inputmode="numeric" data-i18n-placeholder="date_placeholder" placeholder="年/月/日" />
+              <button
+                class="date-picker-button"
+                type="button"
+                data-date-picker-button="end"
+                data-i18n-aria-label="aria_date_picker_end"
+                aria-label="打开结束日期日历"
+                aria-controls="endDatePicker"
+                aria-expanded="false"
+              ></button>
+              <div id="endDatePicker" class="date-picker-popover" data-date-picker="end" hidden></div>
+            </span>
+          </label>
+        </div>
+        <div class="control-group">
+          <label>
+            <span data-i18n="toolbar_granularity">粒度</span>
+            <select id="bucketSelect">
+              <option value="hour" data-i18n="bucket_hour">按小时</option>
+              <option value="day" selected data-i18n="bucket_day">按天</option>
+              <option value="week" data-i18n="bucket_week">按周</option>
+              <option value="month" data-i18n="bucket_month">按月</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="metrics" data-i18n-aria-label="aria_overview" aria-label="总览">
+        <article class="metric">
+          <span data-i18n="metric_total">总 tokens</span>
+          <strong id="totalTokens">-</strong>
+        </article>
+        <article class="metric">
+          <span data-i18n="metric_input">输入</span>
+          <strong id="inputTokens">-</strong>
+        </article>
+        <article class="metric">
+          <span data-i18n="metric_cached">缓存输入</span>
+          <strong id="cachedTokens">-</strong>
+        </article>
+        <article class="metric">
+          <span data-i18n="metric_output">输出</span>
+          <strong id="outputTokens">-</strong>
+        </article>
+        <article class="metric">
+          <span data-i18n="metric_cache_hit">缓存命中率</span>
+          <strong id="cacheHitRate">-</strong>
+        </article>
+        <article class="metric">
+          <span data-i18n="metric_sessions">会话</span>
+          <strong id="sessionCount">-</strong>
+        </article>
+      </section>
+
+      <section id="comparisonSummary" class="comparison-strip" data-i18n-aria-label="aria_trend" aria-label="趋势变化"></section>
+
+      <section class="remote-grid">
+        <section class="panel remote-panel">
+          <div class="panel-heading">
+            <h2 data-i18n="heading_machines">电脑状态</h2>
+            <span id="remoteTotals"></span>
+          </div>
+          <div id="remoteMachineList" class="remote-list"></div>
+        </section>
+        <section class="panel remote-panel">
+          <div class="panel-heading">
+            <h2 data-i18n="heading_tasks">当前任务</h2>
+            <span id="remoteTaskCount"></span>
+          </div>
+          <div id="remoteTaskList" class="remote-list"></div>
+        </section>
+        <section class="panel remote-panel">
+          <div class="panel-heading">
+            <h2 data-i18n="heading_models">模型分布</h2>
+            <div class="list-tools">
+              <input id="modelSearch" type="search" autocomplete="off" data-i18n-placeholder="search_model" data-i18n-aria-label="search_model" placeholder="搜索模型" aria-label="搜索模型" />
+              <button id="modelToggle" class="panel-action" type="button" data-i18n-expand="action_expand" data-i18n-collapse="action_collapse" aria-expanded="false" hidden>展开</button>
+            </div>
+          </div>
+          <div id="modelList" class="compact-list"></div>
+        </section>
+      </section>
+
+      <section class="usage-grid">
+        <section class="panel chart-panel timeline-panel">
+          <div class="panel-heading">
+            <h2 data-i18n="heading_timeline">时间分布</h2>
+            <span id="rangeLabel"></span>
+          </div>
+          <canvas id="timelineChart" width="960" height="320"></canvas>
+          <div id="timelineLegend" class="timeline-legend"></div>
+          <div id="timelineDetails" class="timeline-details" data-i18n-aria-label="aria_timeline_details" aria-label="时间分布明细"></div>
+        </section>
+
+        <div class="stack-panels usage-side-panels">
+          <section class="panel">
+            <div class="panel-heading">
+              <h2 data-i18n="heading_sessions">对话消耗</h2>
+              <div class="list-tools">
+                <input id="sessionSearch" type="search" autocomplete="off" data-i18n-placeholder="search_session" data-i18n-aria-label="search_session" placeholder="搜索对话" aria-label="搜索对话" />
+                <button id="sessionToggle" class="panel-action" type="button" data-i18n-expand="action_expand" data-i18n-collapse="action_collapse" aria-expanded="false" hidden>展开</button>
+              </div>
+            </div>
+            <div id="sessionList" class="compact-list"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <div id="usageTooltip" class="usage-tooltip" role="tooltip" hidden></div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

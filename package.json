@@ -1,0 +1,19 @@
+{
+  "name": "token-usage",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "token-usage": "./src/cli.js"
+  },
+  "scripts": {
+    "export": "node src/static-export.js",
+    "summary": "node src/cli.js summary",
+    "serve": "node src/cli.js run",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

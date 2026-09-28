@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+
+# Build output and generated snapshots
+dist/
+coverage/
+.nyc_output/
+
+# Local runtime state
+.token-usage/
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.jsonl
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+remote-token
+gateway.env
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# Local AI session data copied into the project by mistake
+/.claude/
+/.codex/
+/projects/
+
+# Python and virtual environments
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
