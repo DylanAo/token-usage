@@ -730,12 +730,14 @@ canvas {
 }
 
 .remote-badge.offline,
+.remote-badge.interrupted,
 .remote-badge.completed {
   background: color-mix(in srgb, var(--muted) 16%, var(--panel));
   color: var(--muted);
 }
 
-.remote-badge.unknown {
+.remote-badge.unknown,
+.remote-badge.failed {
   background: color-mix(in srgb, var(--red) 14%, var(--panel));
   color: var(--red);
 }

@@ -1,15 +1,17 @@
 import { stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { SessionActivity } from "./session-activity.js";
 
 import {
   discoverSourceSessionFiles,
   discoverUsageSources,
   loadCodexTitleIndex,
+  normalizeProjectPath,
   streamUsageFileEvents,
 } from "./usage-core.js";
 
-export const AGENT_VERSION = "0.1.0";
+export const AGENT_VERSION = "0.2.1";
 const DEFAULT_INTERVAL_MS = 15000;
 const MAX_EVENTS_PER_REQUEST = 200;
 const MAX_SEEN_EVENTS = 100000;
@@ -24,10 +26,7 @@ export function sessionStatus(lastActivityMs, nowMs = Date.now()) {
   if (age <= 90000) {
     return "active";
   }
-  if (age <= 300000) {
-    return "waiting";
-  }
-  return "completed";
+  return "unknown";
 }
 
 function eventKey(machineId, provider, sessionId, event, index) {
@@ -96,6 +95,7 @@ export async function collectAgentPayload(options, { seen = new Set(), nowMs = D
       }
       let eventIndex = 0;
       let sessionInfo = null;
+      const activity = new SessionActivity(source.provider);
       await streamUsageFileEvents(filePath, source, (event) => {
         eventIndex += 1;
         const sessionId = remoteSessionId(options.machineId, source.provider, event.sessionId);
@@ -141,9 +141,27 @@ export async function collectAgentPayload(options, { seen = new Set(), nowMs = D
           timestampMs: event.timestampMs,
           usage: event.usage,
         });
-      });
-      if (sessionInfo && filePath.includes(`${path.sep}archived_sessions${path.sep}`)) {
-        sessionInfo.lastActivityMs = Math.min(sessionInfo.lastActivityMs, nowMs - 300001);
+      }, (row) => activity.observe(row));
+      if (!sessionInfo && activity.sessionId && activity.lastActivityMs) {
+        const sessionId = remoteSessionId(options.machineId, source.provider, activity.sessionId);
+        sessionInfo = {
+          sessionId,
+          provider: source.provider,
+          title: source.codexTitles?.get(activity.sessionId) || activity.title,
+          project: normalizeProjectPath(activity.project || source.label),
+          model: activity.model,
+          firstAtMs: activity.firstAtMs,
+          lastEventMs: null,
+          lastActivityMs: activity.lastActivityMs,
+        };
+        sessions.set(sessionId, sessionInfo);
+      }
+      if (sessionInfo) {
+        sessionInfo.lastActivityMs = activity.lastActivityMs || sessionInfo.lastEventMs || info.mtimeMs;
+        sessionInfo.status = activity.status || sessionStatus(sessionInfo.lastActivityMs, nowMs);
+        if (filePath.includes(`${path.sep}archived_sessions${path.sep}`) && !["failed", "interrupted"].includes(sessionInfo.status)) {
+          sessionInfo.status = "completed";
+        }
       }
     }
   }
@@ -163,8 +181,8 @@ export async function collectAgentPayload(options, { seen = new Set(), nowMs = D
         title: session.title,
         project: session.project,
         model: session.model,
-        status: sessionStatus(session.lastActivityMs, nowMs),
-        activity: sessionStatus(session.lastActivityMs, nowMs) === "active" ? "working" : "idle",
+        status: session.status,
+        activity: session.status === "active" ? "working" : session.status === "waiting" ? "awaiting_user" : session.status,
         startedAt: new Date(session.firstAtMs).toISOString(),
         lastSeen: new Date(session.lastActivityMs).toISOString(),
         lastEventMs: session.lastEventMs,

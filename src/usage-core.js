@@ -385,7 +385,7 @@ function claudeUsageFromRaw(raw = {}) {
   return { total: input + cached + output, input, cached, output, reasoning };
 }
 
-async function collectClaudeAssistantRows(filePath) {
+async function collectClaudeAssistantRows(filePath, onRecord) {
   // Each unique API response (message.id) is written as a parent-chain of 2-17 rows
   // with identical usage. Deduplicate by message.id so each response counts once.
   const byId = new Map();
@@ -393,6 +393,7 @@ async function collectClaudeAssistantRows(filePath) {
   let title = "";
 
   for await (const row of readJsonlRows(filePath)) {
+    onRecord?.(row);
     if (row.type === "assistant" && row.message?.usage) {
       // Claude Code synthetic rows have no real model or usage — skip them.
       if (row.message.model === "<synthetic>") {
@@ -530,8 +531,8 @@ function createStringInterner() {
   };
 }
 
-async function streamClaudeUsageFileEvents(filePath, source, onEvent) {
-  const { events, sessionId, title } = await collectClaudeAssistantRows(filePath);
+async function streamClaudeUsageFileEvents(filePath, source, onEvent, onRecord) {
+  const { events, sessionId, title } = await collectClaudeAssistantRows(filePath, onRecord);
   for (const event of events) {
     const timestampMs = Date.parse(event.timestamp);
     if (!Number.isFinite(timestampMs)) {
@@ -551,7 +552,7 @@ async function streamClaudeUsageFileEvents(filePath, source, onEvent) {
   }
 }
 
-async function streamCodexUsageFileEvents(filePath, source, onEvent) {
+async function streamCodexUsageFileEvents(filePath, source, onEvent, onRecord) {
   const meta = {
     id: codexSessionIdFromFilePath(filePath),
     source: "",
@@ -564,6 +565,7 @@ async function streamCodexUsageFileEvents(filePath, source, onEvent) {
   let previousCumulative = emptyUsage();
 
   for await (const row of readJsonlRows(filePath)) {
+    onRecord?.(row);
     if (row.timestamp) {
       firstAt ||= row.timestamp;
       lastAt = row.timestamp;
@@ -623,12 +625,12 @@ async function streamCodexUsageFileEvents(filePath, source, onEvent) {
   }
 }
 
-export async function streamUsageFileEvents(filePath, source, onEvent) {
+export async function streamUsageFileEvents(filePath, source, onEvent, onRecord) {
   if (source.provider === "codex") {
-    await streamCodexUsageFileEvents(filePath, source, onEvent);
+    await streamCodexUsageFileEvents(filePath, source, onEvent, onRecord);
     return;
   }
-  await streamClaudeUsageFileEvents(filePath, source, onEvent);
+  await streamClaudeUsageFileEvents(filePath, source, onEvent, onRecord);
 }
 
 export async function parseCodexSessionFile(filePath, source) {

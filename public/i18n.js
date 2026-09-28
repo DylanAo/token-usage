@@ -113,10 +113,14 @@ const zh = {
   remote_offline: "离线",
   remote_active: "进行中",
   remote_waiting: "等待中",
-  remote_completed: "已完成",
+  remote_completed: "已经完成",
+  remote_interrupted: "已中断",
+  remote_failed: "意外中断",
   remote_idle: "空闲",
   remote_unknown: "未知",
   remote_active_count: "进行中",
+  remote_recent_window: "最近 18 小时",
+  remote_untitled_task: "未命名任务",
   remote_ago: "前",
 
   // Home row
@@ -280,9 +284,13 @@ const en = {
   remote_active: "Active",
   remote_waiting: "Waiting",
   remote_completed: "Completed",
+  remote_interrupted: "Interrupted",
+  remote_failed: "Unexpected interruption",
   remote_idle: "Idle",
   remote_unknown: "Unknown",
   remote_active_count: "active",
+  remote_recent_window: "Last 18 hours",
+  remote_untitled_task: "Untitled task",
   remote_ago: "ago",
 
   // Home row

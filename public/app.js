@@ -26,9 +26,7 @@ const state = {
   theme: "light",
   locale: getLocale(),
   projectQuery: "",
-  modelQuery: "",
   projectsExpanded: false,
-  modelsExpanded: false,
   sessionsExpanded: false,
   sessionQuery: "",
   datePickerField: "",
@@ -44,7 +42,9 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const THEME_STORAGE_KEY = "tokenUsageTheme";
 const RANKED_LIST_LIMIT = 25;
 const SESSION_DEFAULT_LIMIT = 5;
-const MODEL_DEFAULT_LIMIT = 5;
+const MODEL_DISPLAY_LIMIT = 3;
+const TASK_DISPLAY_LIMIT = 3;
+const TASK_ACTIVITY_WINDOW_MS = 18 * MS_PER_HOUR;
 const tooltipRows = new WeakMap();
 const timelineBars = new WeakMap();
 
@@ -1019,9 +1019,9 @@ function renderComparison(summary) {
 }
 
 function updateRankedListControls(kind, rows) {
-  const query = kind === "project" ? state.projectQuery : kind === "model" ? state.modelQuery : state.sessionQuery;
-  const expanded = kind === "project" ? state.projectsExpanded : kind === "model" ? state.modelsExpanded : state.sessionsExpanded;
-  const limit = kind === "session" ? SESSION_DEFAULT_LIMIT : kind === "model" ? MODEL_DEFAULT_LIMIT : RANKED_LIST_LIMIT;
+  const query = kind === "project" ? state.projectQuery : state.sessionQuery;
+  const expanded = kind === "project" ? state.projectsExpanded : state.sessionsExpanded;
+  const limit = kind === "session" ? SESSION_DEFAULT_LIMIT : RANKED_LIST_LIMIT;
   const button = $(`#${kind}Toggle`);
   if (!button) {
     return;
@@ -1268,11 +1268,9 @@ function render() {
   renderComparison(summary);
   $("#rangeLabel").textContent = rangeLabel(summary);
   const modelColors = getModelColors(summary.models);
-  const modelRows = filterRankedRows(summary.models, {
-    query: state.modelQuery,
-    expanded: state.modelsExpanded,
-    defaultLimit: MODEL_DEFAULT_LIMIT,
-  });
+  const modelRows = [...summary.models]
+    .sort((first, second) => second.total.total - first.total.total)
+    .slice(0, MODEL_DISPLAY_LIMIT);
   const sessionRows = filterRankedRows(summary.sessions || [], {
     query: state.sessionQuery,
     expanded: state.sessionsExpanded,
@@ -1280,7 +1278,6 @@ function render() {
   });
   renderCompactList($("#sessionList"), sessionRows);
   renderCompactList($("#modelList"), modelRows);
-  updateRankedListControls("model", summary.models);
   updateRankedListControls("session", summary.sessions || []);
   renderRemoteStatus(state.remote);
   drawTimeline($("#timelineChart"), summary.timeline, summary.models, modelColors, summary.range);
@@ -1309,7 +1306,16 @@ function relativeRemoteTime(value) {
   return `${Math.round(seconds / 3600)}h`;
 }
 
-function renderRemoteStatus(remote) {
+export function recentRemoteTasks(tasks, nowMs = Date.now()) {
+  return tasks
+    .filter((task) => {
+      const lastActivityMs = Date.parse(task.lastSeen);
+      return Number.isFinite(lastActivityMs) && lastActivityMs >= nowMs - TASK_ACTIVITY_WINDOW_MS && lastActivityMs <= nowMs;
+    })
+    .sort((first, second) => Date.parse(second.lastSeen) - Date.parse(first.lastSeen));
+}
+
+export function renderRemoteStatus(remote) {
   const machineList = $("#remoteMachineList");
   const taskList = $("#remoteTaskList");
   const totals = $("#remoteTotals");
@@ -1325,10 +1331,12 @@ function renderRemoteStatus(remote) {
     return;
   }
   const machines = remote.machines || [];
-  const tasks = remote.tasks || [];
+  const machineLabels = new Map(machines.map((machine) => [machine.machineId, machine.label || machine.machineId]));
+  const tasks = recentRemoteTasks(remote.tasks || []);
+  const recentTasks = tasks.slice(0, TASK_DISPLAY_LIMIT);
   const onlineCount = machines.filter((machine) => machine.status === "online").length;
   totals.textContent = `${onlineCount}/${machines.length} · ${formatTokens(remote.totals?.total || 0)} tokens`;
-  taskCount.textContent = `${tasks.filter((task) => ["active", "waiting"].includes(task.status)).length} ${t("remote_active_count")}`;
+  taskCount.textContent = `${t("remote_recent_window")} · ${tasks.filter((task) => task.status === "active").length} ${t("remote_active_count")}`;
   machineList.innerHTML = machines.length
     ? machines
         .map(
@@ -1345,17 +1353,16 @@ function renderRemoteStatus(remote) {
         )
         .join("")
     : `<div class="empty">${t("empty_no_machines")}</div>`;
-  taskList.innerHTML = tasks.length
-    ? tasks
-        .slice(0, 20)
+  taskList.innerHTML = recentTasks.length
+    ? recentTasks
         .map(
           (task) => `
             <div class="remote-row">
               <div class="remote-row-title">
-                <strong>${escapeHtml(task.title || task.project || task.sessionId)}</strong>
+                <strong>${escapeHtml(task.title || task.project || t("remote_untitled_task"))}</strong>
                 <span class="remote-badge ${escapeHtml(task.status)}">${remoteStatusLabel(task.status)}</span>
               </div>
-              <div class="remote-row-meta">${escapeHtml(task.machineId)} · ${escapeHtml(task.provider)} · ${escapeHtml(task.activity || "")} · ${escapeHtml(relativeRemoteTime(task.lastSeen))} ${t("remote_ago")}</div>
+              <div class="remote-row-meta">${escapeHtml(task.machineLabel || machineLabels.get(task.machineId) || t("remote_unknown"))} · ${escapeHtml(task.provider)} · ${escapeHtml(relativeRemoteTime(task.lastSeen))} ${t("remote_ago")}</div>
             </div>
           `,
         )
@@ -1645,6 +1652,11 @@ async function checkForUpdates() {
       await loadUsage();
       return;
     }
+    const remoteResponse = await fetch("/api/remote/status");
+    if (remoteResponse.ok) {
+      state.remote = await remoteResponse.json();
+    }
+    renderRemoteStatus(state.remote);
     setAutoRefreshStatus(autoRefreshReadyMessage(status.checkedAt));
   } catch (error) {
     setAutoRefreshStatus(t("status_refresh_failed_prefix") + error.message + t("status_refresh_failed_suffix"));
@@ -1670,8 +1682,6 @@ function updateRankedQuery(kind, value) {
   // Query changes are purely local and should not trigger a server rescan.
   if (kind === "project") {
     state.projectQuery = value;
-  } else if (kind === "model") {
-    state.modelQuery = value;
   } else {
     state.sessionQuery = value;
   }
@@ -1681,8 +1691,6 @@ function updateRankedQuery(kind, value) {
 function toggleRankedExpansion(kind) {
   if (kind === "project") {
     state.projectsExpanded = !state.projectsExpanded;
-  } else if (kind === "model") {
-    state.modelsExpanded = !state.modelsExpanded;
   } else {
     state.sessionsExpanded = !state.sessionsExpanded;
   }
@@ -1802,9 +1810,7 @@ function bootDashboard() {
   });
 
   $("#refreshButton").addEventListener("click", () => loadUsage({ force: true }));
-  $("#modelSearch").addEventListener("input", (event) => updateRankedQuery("model", event.target.value));
   $("#sessionSearch").addEventListener("input", (event) => updateRankedQuery("session", event.target.value));
-  $("#modelToggle").addEventListener("click", () => toggleRankedExpansion("model"));
   $("#sessionToggle").addEventListener("click", () => toggleRankedExpansion("session"));
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {

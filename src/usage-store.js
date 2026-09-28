@@ -18,6 +18,7 @@ import {
 
 const STORE_SCHEMA_VERSION = 4;
 const PROVIDERS = ["claude", "codex"];
+const REMOTE_TASK_WINDOW_MS = 18 * 60 * 60 * 1000;
 
 function providerClause(provider) {
   if (!provider || provider === "all") {
@@ -620,25 +621,28 @@ export class UsageStore {
       };
     });
     const machineStatus = new Map(machines.map((machine) => [machine.machineId, machine.status]));
+    const machineLabels = new Map(machines.map((machine) => [machine.machineId, machine.label]));
     const sessions = this.database.prepare(`
       SELECT machine_id, provider, session_id, title, project, model, status, activity,
              started_at, last_seen, last_event_ms
       FROM remote_sessions
-      ORDER BY last_seen DESC
-    `).all();
+      WHERE julianday(last_seen) >= julianday(?) AND julianday(last_seen) <= julianday(?)
+      ORDER BY julianday(last_seen) DESC
+    `).all(new Date(now - REMOTE_TASK_WINDOW_MS).toISOString(), new Date(now).toISOString());
     const tasks = sessions.map((row) => ({
       machineId: row.machine_id,
+      machineLabel: machineLabels.get(row.machine_id) || row.machine_id,
       provider: row.provider,
       sessionId: row.session_id,
       title: row.title,
       project: row.project,
       model: row.model,
-      status: machineStatus.get(row.machine_id) === "offline" ? "offline" : row.status,
+      status: ["completed", "failed", "interrupted"].includes(row.status) ? row.status : machineStatus.get(row.machine_id) === "offline" ? "offline" : row.status,
       activity: row.activity,
       startedAt: row.started_at,
       lastSeen: row.last_seen,
       lastEventMs: row.last_event_ms,
-    })).filter((task) => task.status !== "completed");
+    }));
     const totals = this.database.prepare(`
       SELECT COALESCE(SUM(total), 0) AS total,
              COALESCE(SUM(input), 0) AS input,
