@@ -5,7 +5,9 @@
 ## 写在前头
 本项目由开源项目 [codex-usage](https://github.com/DhWU-coder/codex-usage)改造而来。原作者的版权与 MIT 许可声明已保留在本仓库的 `LICENSE` 中。
 
-本项目由中国科大「词元计划」提供算力支持，采用deepseek-v4-flash 正式版、deepseek-v4,1-flash、deepseek-v4-pro 预览版模型和deepseek-v4-pro 正式版模型，基于Vibe Coding开发。总计消耗约3亿token。
+本地仪表盘由中国科大「词元计划」提供算力支持，采用deepseek-v4-flash 正式版、deepseek-v4,1-flash、deepseek-v4-pro 预览版模型和deepseek-v4-pro 正式版模型，基于Vibe Coding开发。总计消耗约3亿token。
+
+多电脑 AI 仪表盘由GPT-6 Astra开发，约2700万token。
 
 本项目在一条仪表盘同时统计 **Claude Code** 与 **Codex** 的 token 用量。
 
@@ -161,5 +163,4 @@ node src/cli.js agent
 
 本项目沿用 **MIT License**，见 [LICENSE](LICENSE)。
 
-感谢原项目 [codex-usage](https://github.com/DhWU-coder/codex-usage)（MIT）——本项目基于其代码改造而来，遵循 MIT 协议要求保留了原版权声明。# token-usage
-# token-usage
+感谢原项目 [codex-usage](https://github.com/DhWU-coder/codex-usage)（MIT）——本项目基于其代码改造而来，遵循 MIT 协议要求保留了原版权声明。
